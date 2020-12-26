@@ -1,0 +1,34 @@
+pipeline {
+    agent any
+    tools {
+      terraform 'terraform'
+    }
+    stages {
+        stage('Copy files from Git') {
+            steps {
+              git 'https://github.com/er1in1/CertProject.git'  
+            }
+        }
+        stage('Terraform init') {
+            steps {
+              sh 'terraform init'
+              sh 'terraform plan -out=tfplan'
+            }
+        }
+        stage('Terraform apply') {
+            steps {
+              sh 'terraform apply -input=false tfplan'  
+            }
+        }
+        stage('Ansible Build') {
+            steps {
+              ansiblePlaybook become: true, credentialsId: 'private-key-ubuntu', disableHostKeyChecking: true, installation: 'ansible', playbook: 'Build.yml'  
+            }
+        }
+        stage('Ansible Prod') {
+            steps {
+              ansiblePlaybook become: true, credentialsId: 'private-key-ubuntu', disableHostKeyChecking: true, installation: 'ansible', playbook: 'Prod.yml'  
+            }
+        }
+    }
+}

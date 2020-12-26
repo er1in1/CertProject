@@ -1,0 +1,62 @@
+---
+- name: prepare software build
+  hosts: tag_Name_d14_2
+  become: yes
+  remote_user: ubuntu
+  gather_facts: yes
+  vars_files:
+    - vars.yml
+
+  tasks:
+  - name: Apt update
+    shell: apt update
+  - name: Install software
+    apt: name={{ item }}
+    state: present
+    with_items:
+      - docker.io
+      - git
+      - python3-pip
+
+  - name: Install pip components
+    pip: name={{ item }}
+    state: present
+    with_items:
+      - docker-py
+      - botocore
+      - boto
+      - boto3
+
+  - name: Copy project with Dockerfile  from Github
+    git:
+      repo: 'https://github.com/er1in1/CertProject.git'
+      dest: /home/project
+      clone: yes
+      update: yes
+  - name: Get artifact from bucket
+    amazon.aws.aws_s3:
+      aws_access_key: "{{ aws_access_key }}"
+      aws_secret_key: "{{ aws_secret_key }}"
+      bucket: er1in1bucket
+      object: /hello-1.0.war
+      dest: /home/project/hello-1.0.war
+      mode: get
+  - name: Delete a bucket and all contents
+    amazon.aws.aws_s3:
+      aws_access_key: "{{ aws_access_key }}"
+      aws_secret_key: "{{ aws_secret_key }}"
+      bucket: er1in1bucket
+      mode: delete
+  - name: Build Docker image from Dockerfile
+    docker_image:
+      name: prod
+      path: /home/project/
+      dockerfile: Dockerfile
+      state: build
+  - name: Run container
+    docker_container:
+      name: production
+      state: started
+      image: prod
+      ports:
+          - "8080:8080"
